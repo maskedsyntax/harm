@@ -28,14 +28,24 @@ data Instruction
     | ADD Condition Bool Register Register Operand -- ^ ADD {cond} {S} dst, src1, src2
     | SUB Condition Bool Register Register Operand
     | RSB Condition Bool Register Register Operand
+    | ADC Condition Bool Register Register Operand -- ^ Add with Carry
+    | SBC Condition Bool Register Register Operand -- ^ Subtract with Carry
+    | RSC Condition Bool Register Register Operand -- ^ Reverse Subtract with Carry
     | AND Condition Bool Register Register Operand
     | ORR Condition Bool Register Register Operand
     | EOR Condition Bool Register Register Operand
     | BIC Condition Bool Register Register Operand
     | MUL Condition Bool Register Register Register
     | CMP Condition Register Operand
+    | CMN Condition Register Operand -- ^ Compare Negated
+    | TST Condition Register Operand -- ^ Test bits (AND)
+    | TEQ Condition Register Operand -- ^ Test equivalence (XOR)
     | LDR Condition Register Register -- ^ LDR Rd, [Rn]
     | STR Condition Register Register -- ^ STR Rd, [Rn]
+    | LDRB Condition Register Register -- ^ Load Byte
+    | STRB Condition Register Register -- ^ Store Byte
+    | LDRH Condition Register Register -- ^ Load Halfword
+    | STRH Condition Register Register -- ^ Store Halfword
     | LDM Condition AddressingMode Register Bool [Register] -- ^ LDM Rn{!}, {regs}
     | STM Condition AddressingMode Register Bool [Register] -- ^ STM Rn{!}, {regs}
     | B   Condition Target -- ^ Branch to target

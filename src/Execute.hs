@@ -74,6 +74,15 @@ execute inst state = case inst of
                  state' = setReg state dst res
              in if s then updateFlagsAdd state' v1 v2 res else state'
         else state
+    ADC cond s dst src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 carry = if cFlag (cpsr state) then 1 else 0
+                 res = v1 + v2 + carry
+                 state' = setReg state dst res
+             in if s then updateFlagsAdd state' v1 (v2 + carry) res else state'
+        else state
     SUB cond s dst src1 src2 ->
         if checkCondition (cpsr state) cond
         then let v1 = getReg state src1
@@ -81,6 +90,32 @@ execute inst state = case inst of
                  res = v1 - v2
                  state' = setReg state dst res
              in if s then updateFlagsSub state' v1 v2 res else state'
+        else state
+    SBC cond s dst src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 carry = if cFlag (cpsr state) then 0 else 1
+                 res = v1 - v2 - carry
+                 state' = setReg state dst res
+             in if s then updateFlagsSub state' v1 (v2 + carry) res else state'
+        else state
+    RSB cond s dst src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 res = v2 - v1
+                 state' = setReg state dst res
+             in if s then updateFlagsSub state' v2 v1 res else state'
+        else state
+    RSC cond s dst src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 carry = if cFlag (cpsr state) then 0 else 1
+                 res = v2 - v1 - carry
+                 state' = setReg state dst res
+             in if s then updateFlagsSub state' v2 (v1 + carry) res else state'
         else state
     AND cond s dst src1 src2 ->
         if checkCondition (cpsr state) cond
@@ -114,14 +149,6 @@ execute inst state = case inst of
                  state' = setReg state dst res
              in if s then updateFlagsLogic state' res else state'
         else state
-    RSB cond s dst src1 src2 ->
-        if checkCondition (cpsr state) cond
-        then let v1 = getReg state src1
-                 v2 = evalOperand state src2
-                 res = v2 - v1
-                 state' = setReg state dst res
-             in if s then updateFlagsSub state' v2 v1 res else state'
-        else state
     MUL cond s dst src1 src2 ->
         if checkCondition (cpsr state) cond
         then let v1 = getReg state src1
@@ -136,6 +163,27 @@ execute inst state = case inst of
                  v2 = evalOperand state src2
                  res = v1 - v2
              in updateFlagsSub state v1 v2 res
+        else state
+    CMN cond src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 res = v1 + v2
+             in updateFlagsAdd state v1 v2 res
+        else state
+    TST cond src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 res = v1 .&. v2
+             in updateFlagsLogic state res
+        else state
+    TEQ cond src1 src2 ->
+        if checkCondition (cpsr state) cond
+        then let v1 = getReg state src1
+                 v2 = evalOperand state src2
+                 res = v1 `xor` v2
+             in updateFlagsLogic state res
         else state
     B cond target ->
         if checkCondition (cpsr state) cond
@@ -156,11 +204,39 @@ execute inst state = case inst of
                  val = readMem state addr
              in setReg state dst val
         else state
+    LDRB cond dst baseReg ->
+        if checkCondition (cpsr state) cond
+        then let addr = getReg state baseReg
+                 val = readMem state addr .&. 0xFF
+             in setReg state dst val
+        else state
+    LDRH cond dst baseReg ->
+        if checkCondition (cpsr state) cond
+        then let addr = getReg state baseReg
+                 val = readMem state addr .&. 0xFFFF
+             in setReg state dst val
+        else state
     STR cond src baseReg ->
         if checkCondition (cpsr state) cond
         then let addr = getReg state baseReg
                  val = getReg state src
              in writeMem state addr val
+        else state
+    STRB cond src baseReg ->
+        if checkCondition (cpsr state) cond
+        then let addr = getReg state baseReg
+                 val = getReg state src .&. 0xFF
+                 oldVal = readMem state addr
+                 newVal = (oldVal .&. 0xFFFFFF00) .|. val
+             in writeMem state addr newVal
+        else state
+    STRH cond src baseReg ->
+        if checkCondition (cpsr state) cond
+        then let addr = getReg state baseReg
+                 val = getReg state src .&. 0xFFFF
+                 oldVal = readMem state addr
+                 newVal = (oldVal .&. 0xFFFF0000) .|. val
+             in writeMem state addr newVal
         else state
     LDM cond mode base wb regs ->
         if checkCondition (cpsr state) cond

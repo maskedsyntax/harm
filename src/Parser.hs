@@ -121,7 +121,7 @@ pALU3 name constructor = do
     src2 <- pOperand
     return $ constructor cond s dst src1 src2
 
-pAdd, pSub, pAnd, pOrr, pEor, pBic, pRsb :: Parser Instruction
+pAdd, pSub, pAnd, pOrr, pEor, pBic, pRsb, pAdc, pSbc, pRsc :: Parser Instruction
 pAdd = pALU3 "ADD" ADD
 pSub = pALU3 "SUB" SUB
 pAnd = pALU3 "AND" AND
@@ -129,6 +129,9 @@ pOrr = pALU3 "ORR" ORR
 pEor = pALU3 "EOR" EOR
 pBic = pALU3 "BIC" BIC
 pRsb = pALU3 "RSB" RSB
+pAdc = pALU3 "ADC" ADC
+pSbc = pALU3 "SBC" SBC
+pRsc = pALU3 "RSC" RSC
 
 -- | Parse MUL instruction
 pMul :: Parser Instruction
@@ -141,16 +144,22 @@ pMul = do
     src2 <- pRegister
     return $ MUL cond s dst src1 src2
 
--- | Parse CMP instruction
-pCmp :: Parser Instruction
-pCmp = do
-    _ <- string' "CMP"
+-- | Parse CMP/CMN/TST/TEQ instructions
+pTestInst :: String -> (Condition -> Register -> Operand -> Instruction) -> Parser Instruction
+pTestInst name constructor = do
+    _ <- string' name
     cond <- pCondition
     _ <- sc
     src1 <- pRegister
     _ <- symbol ","
     src2 <- pOperand
-    return $ CMP cond src1 src2
+    return $ constructor cond src1 src2
+
+pCmp, pCmn, pTst, pTeq :: Parser Instruction
+pCmp = pTestInst "CMP" CMP
+pCmn = pTestInst "CMN" CMN
+pTst = pTestInst "TST" TST
+pTeq = pTestInst "TEQ" TEQ
 
 -- | Parse a label definition (e.g., "loop:")
 pLabelDef :: Parser String
@@ -190,9 +199,13 @@ pLdrStr name constructor = do
     _ <- symbol "]"
     return $ constructor cond dst src
 
-pLdr, pStr :: Parser Instruction
+pLdr, pStr, pLdrb, pStrb, pLdrh, pStrh :: Parser Instruction
 pLdr = try pLdrPseudo <|> pLdrStr "LDR" LDR
 pStr = pLdrStr "STR" STR
+pLdrb = pLdrStr "LDRB" LDRB
+pStrb = pLdrStr "STRB" STRB
+pLdrh = pLdrStr "LDRH" LDRH
+pStrh = pLdrStr "STRH" STRH
 
 pLdrPseudo :: Parser Instruction
 pLdrPseudo = do
@@ -256,8 +269,10 @@ pStm = pBlockTrans "STM" STM
 pInstruction :: Parser Instruction
 pInstruction = choice 
     [ try pMov, try pMvn, try pAdd, try pSub, try pAnd, try pOrr
-    , try pEor, try pBic, try pRsb, try pMul, try pCmp
-    , try pLdr, try pStr, try pLdm, try pStm, try pBranch, try pAdr
+    , try pEor, try pBic, try pRsb, try pAdc, try pSbc, try pRsc
+    , try pMul, try pCmp, try pCmn, try pTst, try pTeq
+    , try pLdr, try pStr, try pLdrb, try pStrb, try pLdrh, try pStrh
+    , try pLdm, try pStm, try pBranch, try pAdr
     ]
 
 -- | Either an instruction or a label definition
