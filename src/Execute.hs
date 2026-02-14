@@ -143,6 +143,13 @@ execute inst state = case inst of
             ImmAddr addr -> setReg state PC addr
             TLabel name -> error $ "Unresolved label in execution: " ++ name
         else state
+    BL cond target ->
+        if checkCondition (cpsr state) cond
+        then let state' = setReg state LR (getReg state PC)
+             in case target of
+                 ImmAddr addr -> setReg state' PC addr
+                 TLabel name -> error $ "Unresolved label in execution: " ++ name
+        else state
     LDR cond dst baseReg ->
         if checkCondition (cpsr state) cond
         then let addr = getReg state baseReg

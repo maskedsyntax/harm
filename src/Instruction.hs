@@ -39,6 +39,9 @@ data Instruction
     | LDM Condition AddressingMode Register Bool [Register] -- ^ LDM Rn{!}, {regs}
     | STM Condition AddressingMode Register Bool [Register] -- ^ STM Rn{!}, {regs}
     | B   Condition Target -- ^ Branch to target
+    | BL  Condition Target -- ^ Branch with Link to target
+    | ADR Condition Register String -- ^ ADR Rd, label (Pseudo)
+    | LDRPseudo Condition Register Word32 -- ^ LDR Rd, =val (Pseudo)
     deriving (Show, Eq)
 
 data AddressingMode = IA | IB | DA | DB deriving (Show, Eq)

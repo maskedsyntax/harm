@@ -166,14 +166,16 @@ pTarget = choice
     , TLabel <$> some (alphaNumChar <|> char '_')
     ]
 
--- | Parse B instruction
+-- | Parse B/BL instruction
 pBranch :: Parser Instruction
 pBranch = do
-    _ <- string' "B"
+    mnemonic <- try (string' "BL") <|> try (string' "B")
     cond <- pCondition
     _ <- sc
     target <- pTarget
-    return $ B cond target
+    return $ if mnemonic == "BL" || mnemonic == "bl"
+             then BL cond target
+             else B cond target
 
 -- | Parse LDR/STR instructions
 pLdrStr :: String -> (Condition -> Register -> Register -> Instruction) -> Parser Instruction
@@ -189,8 +191,29 @@ pLdrStr name constructor = do
     return $ constructor cond dst src
 
 pLdr, pStr :: Parser Instruction
-pLdr = pLdrStr "LDR" LDR
+pLdr = try pLdrPseudo <|> pLdrStr "LDR" LDR
 pStr = pLdrStr "STR" STR
+
+pLdrPseudo :: Parser Instruction
+pLdrPseudo = do
+    _ <- string' "LDR"
+    cond <- pCondition
+    _ <- sc
+    dst <- pRegister
+    _ <- symbol ","
+    _ <- symbol "="
+    val <- pHexOrDec
+    return $ LDRPseudo cond dst val
+
+pAdr :: Parser Instruction
+pAdr = do
+    _ <- string' "ADR"
+    cond <- pCondition
+    _ <- sc
+    dst <- pRegister
+    _ <- symbol ","
+    label <- some (alphaNumChar <|> char '_')
+    return $ ADR cond dst label
 
 -- | Parse a register list like {R0, R1-R3, R5}
 pRegList :: Parser [Register]
@@ -234,7 +257,7 @@ pInstruction :: Parser Instruction
 pInstruction = choice 
     [ try pMov, try pMvn, try pAdd, try pSub, try pAnd, try pOrr
     , try pEor, try pBic, try pRsb, try pMul, try pCmp
-    , try pLdr, try pStr, try pLdm, try pStm, try pBranch
+    , try pLdr, try pStr, try pLdm, try pStm, try pBranch, try pAdr
     ]
 
 -- | Either an instruction or a label definition

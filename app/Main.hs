@@ -49,6 +49,15 @@ resolveLabels labels (B cond (TLabel name)) =
     case Map.lookup name labels of
         Just addr -> B cond (ImmAddr addr)
         Nothing -> error $ "Undefined label: " ++ name
+resolveLabels labels (BL cond (TLabel name)) = 
+    case Map.lookup name labels of
+        Just addr -> BL cond (ImmAddr addr)
+        Nothing -> error $ "Undefined label: " ++ name
+resolveLabels labels (ADR cond reg name) =
+    case Map.lookup name labels of
+        Just addr -> MOV cond False reg (Imm addr)
+        Nothing -> error $ "Undefined label: " ++ name
+resolveLabels _ (LDRPseudo cond reg val) = MOV cond False reg (Imm val)
 resolveLabels _ inst = inst
 
 runProgram :: Map.Map Word32 Instruction -> CPUState -> CPUState
