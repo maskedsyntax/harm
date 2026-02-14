@@ -36,7 +36,10 @@ data Instruction
     | CMP Condition Register Operand
     | LDR Condition Register Register -- ^ LDR Rd, [Rn]
     | STR Condition Register Register -- ^ STR Rd, [Rn]
+    | LDM Condition AddressingMode Register Bool [Register] -- ^ LDM Rn{!}, {regs}
+    | STM Condition AddressingMode Register Bool [Register] -- ^ STM Rn{!}, {regs}
     | B   Condition Target -- ^ Branch to target
     deriving (Show, Eq)
 
+data AddressingMode = IA | IB | DA | DB deriving (Show, Eq)
 data Target = ImmAddr Word32 | TLabel String deriving (Show, Eq)

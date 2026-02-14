@@ -192,12 +192,49 @@ pLdr, pStr :: Parser Instruction
 pLdr = pLdrStr "LDR" LDR
 pStr = pLdrStr "STR" STR
 
+-- | Parse a register list like {R0, R1-R3, R5}
+pRegList :: Parser [Register]
+pRegList = symbol "{" >> (concat <$> sepBy pRegRange (symbol ",")) <* symbol "}"
+  where
+    pRegRange = do
+        start <- pRegister
+        end <- optional (symbol "-" >> pRegister)
+        case end of
+            Nothing -> return [start]
+            Just e  -> return [start .. e]
+
+-- | Parse LDM/STM
+pBlockTrans :: String -> (Condition -> AddressingMode -> Register -> Bool -> [Register] -> Instruction) -> Parser Instruction
+pBlockTrans name constructor = do
+    _ <- string' name
+    mode <- pAddrMode
+    cond <- pCondition
+    _ <- sc
+    base <- pRegister
+    writeback <- (symbol "!" >> return True) <|> return False
+    _ <- symbol ","
+    regs <- pRegList
+    return $ constructor cond mode base writeback regs
+
+pAddrMode :: Parser AddressingMode
+pAddrMode = choice
+    [ try (string' "IA") >> return IA
+    , try (string' "IB") >> return IB
+    , try (string' "DA") >> return DA
+    , try (string' "DB") >> return DB
+    , return IA -- Default to Increment After
+    ]
+
+pLdm, pStm :: Parser Instruction
+pLdm = pBlockTrans "LDM" LDM
+pStm = pBlockTrans "STM" STM
+
 -- | Simple parser for a single instruction
 pInstruction :: Parser Instruction
 pInstruction = choice 
     [ try pMov, try pMvn, try pAdd, try pSub, try pAnd, try pOrr
     , try pEor, try pBic, try pRsb, try pMul, try pCmp
-    , try pLdr, try pStr, try pBranch
+    , try pLdr, try pStr, try pLdm, try pStm, try pBranch
     ]
 
 -- | Either an instruction or a label definition

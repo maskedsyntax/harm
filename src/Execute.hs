@@ -155,7 +155,39 @@ execute inst state = case inst of
                  val = getReg state src
              in writeMem state addr val
         else state
+    LDM cond mode base wb regs ->
+        if checkCondition (cpsr state) cond
+        then let startAddr = getReg state base
+                 (addrs, finalAddr) = calculateAddrs mode startAddr (length regs)
+                 vals = map (readMem state) addrs
+                 state' = foldl (\s (r, v) -> setReg s r v) state (zip regs vals)
+             in if wb then setReg state' base finalAddr else state'
+        else state
+    STM cond mode base wb regs ->
+        if checkCondition (cpsr state) cond
+        then let startAddr = getReg state base
+                 (addrs, finalAddr) = calculateAddrs mode startAddr (length regs)
+                 vals = map (getReg state) regs
+                 state' = foldl (\s (a, v) -> writeMem s a v) state (zip addrs vals)
+             in if wb then setReg state' base finalAddr else state'
+        else state
     _ -> state
+
+calculateAddrs :: AddressingMode -> Word32 -> Int -> ([Word32], Word32)
+calculateAddrs mode base count = 
+    let n = fromIntegral count
+        offsets = case mode of
+            IA -> [0, 4 .. (n-1)*4]
+            IB -> [4, 8 .. n*4]
+            DA -> [-(n-1)*4, -(n-2)*4 .. 0]
+            DB -> [-n*4, -(n-1)*4 .. -4]
+        addrs = map (\o -> fromIntegral (fromIntegral base + o :: Int32)) offsets
+        finalAddr = case mode of
+            IA -> base + fromIntegral (n*4)
+            IB -> base + fromIntegral (n*4)
+            DA -> base - fromIntegral (n*4)
+            DB -> base - fromIntegral (n*4)
+    in (addrs, finalAddr)
 
 -- | Update flags for logical operations (only N and Z)
 updateFlagsLogic :: CPUState -> Word32 -> CPUState
