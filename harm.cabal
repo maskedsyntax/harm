@@ -82,3 +82,12 @@ executable harm
 
     -- Base language which the package is written in.
     default-language: Haskell2010
+
+test-suite harm-test
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    build-depends:    base,
+                      harm,
+                      containers
+    hs-source-dirs:   test
+    default-language: Haskell2010

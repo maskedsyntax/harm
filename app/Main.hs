@@ -5,9 +5,12 @@ import Parser
 import Execute
 import Instruction
 import Data.Word (Word32)
-import System.IO (hFlush, stdout)
+import Data.Bits ((.&.))
+import System.IO (hFlush, stdout, hPutChar)
 import Data.List (isPrefixOf)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+import Data.Char (chr)
 import Text.Printf (printf)
 
 import System.Environment (getArgs)
@@ -32,8 +35,8 @@ runFile path = do
         Right contents -> do
             let (instMap, labelMap) = assemble contents
             let resolvedInstMap = Map.map (resolveLabels labelMap) instMap
-            let finalState = runProgram resolvedInstMap initCPU
-            putStrLn "Final Register State:"
+            finalState <- runProgram resolvedInstMap initCPU
+            putStrLn "\nFinal Register State:"
             printRegisters finalState
 
 assemble :: [Maybe LineContent] -> (Map.Map Word32 Instruction, Map.Map String Word32)
@@ -61,15 +64,29 @@ resolveLabels labels (ADR cond reg name) =
 resolveLabels _ (LDRPseudo cond reg val) = MOV cond False reg (Imm val)
 resolveLabels _ inst = inst
 
-runProgram :: Map.Map Word32 Instruction -> CPUState -> CPUState
-runProgram insts state =
+runProgram :: Map.Map Word32 Instruction -> CPUState -> IO CPUState
+runProgram insts state = do
     let pcVal = getReg state PC
-    in case Map.lookup pcVal insts of
-        Nothing -> state -- Halt if PC points to no instruction
-        Just inst ->
-            let state' = setReg state PC (pcVal + 4) -- Auto-increment PC
-                state'' = execute inst state'
-            in runProgram insts state''
+    case Map.lookup pcVal insts of
+        Nothing -> return state
+        Just inst -> do
+            let state' = setReg state PC (pcVal + 4)
+            let state'' = execute inst state'
+            state''' <- handleIO state''
+            if Set.member pcVal (breakpoints state''')
+                then do
+                    putStrLn $ printf "\nBreakpoint reached at 0x%08X" pcVal
+                    return state'''
+                else runProgram insts state'''
+
+handleIO :: CPUState -> IO CPUState
+handleIO state = 
+    case Map.lookup uartAddr (memory state) of
+        Just val -> do
+            hPutChar stdout (chr (fromIntegral (val .&. 0xFF)))
+            hFlush stdout
+            return state { memory = Map.delete uartAddr (memory state) }
+        Nothing -> return state
 
 repl :: CPUState -> IO ()
 repl state = do
@@ -90,6 +107,12 @@ repl state = do
                 let state' = writeMem state addr val
                 repl state'
             _ -> putStrLn "Usage: poke <addr> <val>" >> repl state
+        "break" -> case ws of
+            [_, addrStr] -> do
+                let addr = read (ensureHex addrStr) :: Word32
+                let state' = state { breakpoints = Set.insert addr (breakpoints state) }
+                repl state'
+            _ -> putStrLn "Usage: break <addr>" >> repl state
         "step" -> case ws of
             [_, filename] -> stepFile filename state
             _ -> putStrLn "Usage: step <filename>" >> repl state
@@ -102,8 +125,9 @@ repl state = do
             Right (Just (LLabel _)) -> repl state -- Ignore labels in REPL for now
             Right (Just (LInstruction instr)) -> do
                 let state' = execute instr state
-                printRegisters state'
-                repl state'
+                state'' <- handleIO state'
+                printRegisters state''
+                repl state''
 
 ensureHex :: String -> String
 ensureHex s = if "0x" `isPrefixOf` s then s else "0x" ++ s
@@ -118,13 +142,14 @@ stepFile path state = do
         Right contents -> do
             let (instMap, labelMap) = assemble contents
             let resolvedInstMap = Map.map (resolveLabels labelMap) instMap
-            stepProgram resolvedInstMap state
+            _ <- stepProgram resolvedInstMap state
+            return ()
 
-stepProgram :: Map.Map Word32 Instruction -> CPUState -> IO ()
+stepProgram :: Map.Map Word32 Instruction -> CPUState -> IO CPUState
 stepProgram insts state = do
     let pcVal = getReg state PC
     case Map.lookup pcVal insts of
-        Nothing -> putStrLn "Program Halted." >> repl state
+        Nothing -> putStrLn "Program Halted." >> return state
         Just inst -> do
             putStrLn $ printf "[PC: 0x%08X] %s" pcVal (show inst)
             putStr "step> "
@@ -132,8 +157,9 @@ stepProgram insts state = do
             _ <- getLine -- Wait for Enter
             let state' = setReg state PC (pcVal + 4)
             let state'' = execute inst state'
-            printRegisters state''
-            stepProgram insts state''
+            state''' <- handleIO state''
+            printRegisters state'''
+            stepProgram insts state'''
 
 printMemory :: CPUState -> IO ()
 printMemory state = do

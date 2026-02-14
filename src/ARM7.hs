@@ -2,6 +2,11 @@ module ARM7 where
 
 import Data.Word (Word32)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+-- | Virtual I/O addresses
+uartAddr :: Word32
+uartAddr = 0x10000000
 
 -- | ARM7 Registers
 data Register
@@ -26,9 +31,10 @@ defaultFlags = Flags False False False False
 
 -- | CPU State
 data CPUState = CPUState
-    { registers :: Map.Map Register Word32
-    , cpsr      :: Flags
-    , memory    :: Map.Map Word32 Word32 -- Simplified memory model (Address -> Word)
+    { registers   :: Map.Map Register Word32
+    , cpsr        :: Flags
+    , memory      :: Map.Map Word32 Word32 -- Simplified memory model (Address -> Word)
+    , breakpoints :: Set.Set Word32
     } deriving (Show, Eq)
 
 -- | Initialize CPU with all registers at 0
@@ -37,6 +43,7 @@ initCPU = CPUState
     { registers = Map.fromList [(r, 0) | r <- [R0 .. R15]]
     , cpsr      = defaultFlags
     , memory    = Map.empty
+    , breakpoints = Set.empty
     }
 
 -- | Helper to get register value
