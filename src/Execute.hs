@@ -3,7 +3,8 @@ module Execute where
 import ARM7
 import Instruction
 import Data.Word (Word32)
-import Data.Bits ((.&.), (.|.), xor, complement)
+import Data.Int (Int32)
+import Data.Bits ((.&.), (.|.), xor, complement, shiftL, shiftR, rotateR)
 
 -- | Check if the instruction should execute based on current flags
 checkCondition :: Flags -> Condition -> Bool
@@ -26,8 +27,29 @@ checkCondition flags cond = case cond of
 
 -- | Evaluate an operand to get its 32-bit value
 evalOperand :: CPUState -> Operand -> Word32
-evalOperand _ (Imm val)     = val
-evalOperand state (Reg r)   = getReg state r
+evalOperand _ (Imm val)             = val
+evalOperand state (RegShift r mShift) = 
+    let val = getReg state r
+    in case mShift of
+        Nothing -> val
+        Just shift -> applyShift state val shift
+
+applyShift :: CPUState -> Word32 -> Shift -> Word32
+applyShift state val shift =
+    let amount = case getShiftValue shift of
+            ShiftImm imm -> imm
+            ShiftReg r   -> getReg state r .&. 0xFF -- Only bottom byte used
+    in case shift of
+        LSL _ -> val `shiftL` fromIntegral amount
+        LSR _ -> val `shiftR` fromIntegral amount
+        ASR _ -> fromIntegral (fromIntegral val `shiftR` fromIntegral amount :: Int32)
+        ROR _ -> val `rotateR` fromIntegral amount
+
+getShiftValue :: Shift -> ShiftValue
+getShiftValue (LSL v) = v
+getShiftValue (LSR v) = v
+getShiftValue (ASR v) = v
+getShiftValue (ROR v) = v
 
 -- | Execute a single instruction
 execute :: Instruction -> CPUState -> CPUState

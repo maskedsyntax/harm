@@ -38,7 +38,27 @@ pRegister = lexeme $ choice
 pOperand :: Parser Operand
 pOperand = choice
     [ Imm <$> (symbol "#" >> pHexOrDec)
-    , Reg <$> pRegister
+    , try pRegShift
+    ]
+
+pRegShift :: Parser Operand
+pRegShift = do
+    r <- pRegister
+    shift <- optional (symbol "," >> pShift)
+    return $ RegShift r shift
+
+pShift :: Parser Shift
+pShift = choice
+    [ try (string' "LSL") >> sc >> (LSL <$> pShiftValue)
+    , try (string' "LSR") >> sc >> (LSR <$> pShiftValue)
+    , try (string' "ASR") >> sc >> (ASR <$> pShiftValue)
+    , try (string' "ROR") >> sc >> (ROR <$> pShiftValue)
+    ]
+
+pShiftValue :: Parser ShiftValue
+pShiftValue = choice
+    [ ShiftImm <$> (symbol "#" >> pHexOrDec)
+    , ShiftReg <$> pRegister
     ]
 
 pHexOrDec :: Parser Word32

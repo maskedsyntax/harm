@@ -11,7 +11,14 @@ data Condition
 -- | Operands for instructions
 data Operand
     = Imm Word32      -- ^ Immediate value
-    | Reg Register    -- ^ Register value
+    | RegShift Register (Maybe Shift) -- ^ Register value with optional shift
+    deriving (Show, Eq)
+
+-- | ARM Shift types
+data Shift = LSL ShiftValue | LSR ShiftValue | ASR ShiftValue | ROR ShiftValue
+    deriving (Show, Eq)
+
+data ShiftValue = ShiftImm Word32 | ShiftReg Register
     deriving (Show, Eq)
 
 -- | ARM7 Instruction Set (Subset)
