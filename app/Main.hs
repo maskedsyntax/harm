@@ -6,6 +6,7 @@ import Execute
 import Instruction
 import Data.Word (Word32)
 import System.IO (hFlush, stdout)
+import Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import Text.Printf (printf)
 
@@ -75,12 +76,23 @@ repl state = do
     putStr "harm> "
     hFlush stdout
     input <- getLine
-    let cmd = head (words input ++ [""])
+    let ws = words input
+    let cmd = head (ws ++ [""])
     case cmd of
         "exit" -> putStrLn "Goodbye!"
         "dump" -> do
             printMemory state
             repl state
+        "poke" -> case ws of
+            [_, addrStr, valStr] -> do
+                let addr = read (ensureHex addrStr) :: Word32
+                let val = read (ensureHex valStr) :: Word32
+                let state' = writeMem state addr val
+                repl state'
+            _ -> putStrLn "Usage: poke <addr> <val>" >> repl state
+        "step" -> case ws of
+            [_, filename] -> stepFile filename state
+            _ -> putStrLn "Usage: step <filename>" >> repl state
         ""     -> repl state
         _      -> case parseLineContent input of
             Left err -> do
@@ -92,6 +104,36 @@ repl state = do
                 let state' = execute instr state
                 printRegisters state'
                 repl state'
+
+ensureHex :: String -> String
+ensureHex s = if "0x" `isPrefixOf` s then s else "0x" ++ s
+
+stepFile :: FilePath -> CPUState -> IO ()
+stepFile path state = do
+    content <- readFile path
+    let lines' = lines content
+    let parsed = map parseLineContent lines'
+    case sequence parsed of
+        Left err -> putStrLn $ "Error parsing file:\n" ++ err
+        Right contents -> do
+            let (instMap, labelMap) = assemble contents
+            let resolvedInstMap = Map.map (resolveLabels labelMap) instMap
+            stepProgram resolvedInstMap state
+
+stepProgram :: Map.Map Word32 Instruction -> CPUState -> IO ()
+stepProgram insts state = do
+    let pcVal = getReg state PC
+    case Map.lookup pcVal insts of
+        Nothing -> putStrLn "Program Halted." >> repl state
+        Just inst -> do
+            putStrLn $ printf "[PC: 0x%08X] %s" pcVal (show inst)
+            putStr "step> "
+            hFlush stdout
+            _ <- getLine -- Wait for Enter
+            let state' = setReg state PC (pcVal + 4)
+            let state'' = execute inst state'
+            printRegisters state''
+            stepProgram insts state''
 
 printMemory :: CPUState -> IO ()
 printMemory state = do
