@@ -52,7 +52,7 @@ common warnings
 
 library
     import:           warnings
-    exposed-modules:  ARM7, Instruction, Parser
+    exposed-modules:  ARM7, Instruction, Parser, Execute
     build-depends:    base ^>=4.17.2.0,
                       containers,
                       megaparsec
@@ -74,6 +74,7 @@ executable harm
 
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.17.2.0,
+                      containers,
                       harm
 
     -- Directories containing source files.

@@ -56,3 +56,11 @@ setReg state reg val = state { registers = Map.insert (normalizeReg reg) val (re
     normalizeReg LR = R14
     normalizeReg PC = R15
     normalizeReg r  = r
+
+-- | Helper to read memory
+readMem :: CPUState -> Word32 -> Word32
+readMem state addr = Map.findWithDefault 0 addr (memory state)
+
+-- | Helper to write memory
+writeMem :: CPUState -> Word32 -> Word32 -> CPUState
+writeMem state addr val = state { memory = Map.insert addr val (memory state) }
