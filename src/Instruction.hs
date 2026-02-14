@@ -29,5 +29,7 @@ data Instruction
     | CMP Condition Register Operand
     | LDR Condition Register Register -- ^ LDR Rd, [Rn]
     | STR Condition Register Register -- ^ STR Rd, [Rn]
-    | B   Condition Word32 -- ^ Branch to address/offset
+    | B   Condition Target -- ^ Branch to target
     deriving (Show, Eq)
+
+data Target = ImmAddr Word32 | TLabel String deriving (Show, Eq)

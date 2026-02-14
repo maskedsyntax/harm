@@ -1,6 +1,6 @@
 module Parser where
 
-import Text.Megaparsec
+import Text.Megaparsec hiding (label)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Void
@@ -132,13 +132,27 @@ pCmp = do
     src2 <- pOperand
     return $ CMP cond src1 src2
 
+-- | Parse a label definition (e.g., "loop:")
+pLabelDef :: Parser String
+pLabelDef = lexeme $ do
+    name <- some (alphaNumChar <|> char '_')
+    _ <- char' ':'
+    return name
+
+-- | Parse B instruction target
+pTarget :: Parser Target
+pTarget = choice
+    [ try (ImmAddr <$> pHexOrDec)
+    , TLabel <$> some (alphaNumChar <|> char '_')
+    ]
+
 -- | Parse B instruction
 pBranch :: Parser Instruction
 pBranch = do
     _ <- string' "B"
     cond <- pCondition
     _ <- sc
-    target <- L.decimal -- For now, just a raw number
+    target <- pTarget
     return $ B cond target
 
 -- | Parse LDR/STR instructions
@@ -165,6 +179,21 @@ pInstruction = choice
     , try pEor, try pBic, try pRsb, try pMul, try pCmp
     , try pLdr, try pStr, try pBranch
     ]
+
+-- | Either an instruction or a label definition
+data LineContent = LInstruction Instruction | LLabel String deriving (Show, Eq)
+
+pLine :: Parser (Maybe LineContent)
+pLine = choice
+    [ Just . LLabel <$> try pLabelDef
+    , Just . LInstruction <$> try pInstruction
+    , return Nothing
+    ]
+
+parseLineContent :: String -> Either String (Maybe LineContent)
+parseLineContent input = case parse (sc >> pLine <* eof) "" input of
+    Left err -> Left (errorBundlePretty err)
+    Right val -> Right val
 
 parseLine :: String -> Either String (Maybe Instruction)
 parseLine input = case parse (sc >> optional pInstruction <* eof) "" input of
